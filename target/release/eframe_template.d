@@ -1,0 +1,1 @@
+/Users/prohurtz/Documents/GitHub/eframe_template/target/release/eframe_template: /Users/prohurtz/Documents/GitHub/eframe_template/assets/icon-256.png /Users/prohurtz/Documents/GitHub/eframe_template/src/app.rs /Users/prohurtz/Documents/GitHub/eframe_template/src/lib.rs /Users/prohurtz/Documents/GitHub/eframe_template/src/main.rs
