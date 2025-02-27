@@ -20,6 +20,8 @@ eframe = { version = "0.30", default-features = false, features = [
     "wayland",       # To support Linux (and CI)
 ] }
 log = "0.4"
+rosc = "~0.10"
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "net", "sync", "macros"] }
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }

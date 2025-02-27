@@ -1,23 +1,30 @@
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
+
+use::std::time::Duration;
+use std::sync::mpsc::{self, Receiver};
+
 #[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[serde(default)]
 pub struct TemplateApp {
-
-    osc_ip: String,
-
-    #[serde(skip)] // This how you opt-out of serialization of a field
-    value: f32,
-    value_max: i8,
-    value_min: i8,
-    osc_port: String,
-    is_running: bool,
-    esp_port_1: String,
+    pub osc_ip: String,
+    #[serde(skip)]
+    pub value: f32,
+    pub value_max: i8,
+    pub value_min: i8,
+    pub osc_port: String,
+    pub is_running: bool,
+    pub esp_port_1: String,
+    pub pelt_temp_1: i8,
+    #[serde(skip)]
+    pub osc_receiver: Receiver<i8>, // Channel receiver for OSC updates
+    #[serde(skip)]
+    pub last_update_time: std::time::Instant,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
+        let (_, osc_receiver) = mpsc::channel(); // Create a channel
         Self {
-         
             osc_ip: "127.0.0.1".to_owned(),
             value: 2.7,
             value_max: 40,
@@ -25,11 +32,22 @@ impl Default for TemplateApp {
             osc_port: "9000".to_owned(),
             is_running: false,
             esp_port_1: "COM1".to_owned(),
+            pelt_temp_1: 0,
+            last_update_time: std::time::Instant::now(),
+            osc_receiver, // Initialize the receiver
         }
     }
 }
 
+
+
 impl TemplateApp {
+    pub fn update_pelt_temp(&mut self, _id: i8, temp: i8) {
+        self.pelt_temp_1 = temp;
+        
+    }
+    
+
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -46,6 +64,7 @@ impl TemplateApp {
 }
 
 impl eframe::App for TemplateApp {
+    
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
@@ -55,6 +74,13 @@ impl eframe::App for TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
+        if let Ok(temp) = self.osc_receiver.try_recv() {
+            self.update_pelt_temp(1, temp); // Update the temperature
+            ctx.request_repaint(); // Force the GUI to refresh
+        }
+
+        ctx.request_repaint_after_for(Duration::from_millis(750), ctx.viewport_id());
+        
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -148,7 +174,11 @@ impl eframe::App for TemplateApp {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY);
                 ui.label("Temp:");
                 ui.label("25C");
-                ui.label("➡ 30C");
+                ui.label("➡ ");
+                ui.label(format!("{}°C", self.pelt_temp_1));
+                if ui.button("Simulate Update").clicked() {
+                    self.update_pelt_temp(1, 25); // Example temperature
+                }
                 
             });
             ui.horizontal(|ui| {
