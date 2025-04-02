@@ -195,7 +195,10 @@ impl TemplateApp {
     }
     fn render_app_settings_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("App Settings");
+        ui.separator();
+        
         egui::widgets::global_theme_preference_buttons(ui);
+    
     }
 
 }
@@ -237,14 +240,52 @@ impl eframe::App for TemplateApp {
         
         // Page navigation buttons at the top center
         egui::TopBottomPanel::top("page_navigation").show(ctx, |ui| {
-            ui.horizontal_centered(|ui| {
-                ui.selectable_value(&mut self.current_page, Page::Home, "Home");
-                ui.selectable_value(&mut self.current_page, Page::OscSettings, "OSC Settings");
-                ui.selectable_value(&mut self.current_page, Page::EspConnection, "ESP Connection");
-                ui.selectable_value(&mut self.current_page, Page::AppSettings, "App Settings");
+            ui.vertical_centered(|ui| {
+              //  ui.add_space(3.0); // Add padding at the top
+                
+                let button_height = 32.0;
+                let button_width = 100.0;
+ 
+                // Create a horizontal layout with centered content
+                ui.horizontal_centered(|ui| {
+                    
+                    // Increase spacing between buttons
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    ui.spacing_mut().button_padding = egui::vec2(0.0, 8.0);
+                    
+                    // Create custom sized buttons
+                    if ui.add_sized(
+                        [button_width, button_height],
+                        egui::SelectableLabel::new(self.current_page == Page::Home, "Home")
+                    ).clicked() {
+                        self.current_page = Page::Home;
+                    }
+                    
+                    if ui.add_sized(
+                        [button_width, button_height],
+                        egui::SelectableLabel::new(self.current_page == Page::OscSettings, "OSC Settings")
+                    ).clicked() {
+                        self.current_page = Page::OscSettings;
+                    }
+                    
+                    if ui.add_sized(
+                        [button_width, button_height],
+                        egui::SelectableLabel::new(self.current_page == Page::EspConnection, "ESP Connection")
+                    ).clicked() {
+                        self.current_page = Page::EspConnection;
+                    }
+                    
+                    if ui.add_sized(
+                        [button_width, button_height],
+                        egui::SelectableLabel::new(self.current_page == Page::AppSettings, "App Settings")
+                    ).clicked() {
+                        self.current_page = Page::AppSettings;
+                    }
+                });
+                
+                ui.add_space(8.0); // Add padding at the bottom
             });
         });
-
         // Central panel with the current page content
         egui::CentralPanel::default().show(ctx, |ui| {
             // Display different content based on the current page
