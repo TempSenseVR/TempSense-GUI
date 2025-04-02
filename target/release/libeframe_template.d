@@ -1,1 +1,1 @@
-/Users/prohurtz/Documents/GitHub/eframe_template/target/release/libeframe_template.rlib: /Users/prohurtz/Documents/GitHub/eframe_template/src/app.rs /Users/prohurtz/Documents/GitHub/eframe_template/src/lib.rs
+/Users/prohurtz/Documents/GitHub/TempSense-GUI/target/release/libeframe_template.rlib: /Users/prohurtz/Documents/GitHub/TempSense-GUI/src/app.rs /Users/prohurtz/Documents/GitHub/TempSense-GUI/src/lib.rs
