@@ -81,9 +81,9 @@ impl TemplateApp {
             ui.label("25C");
             ui.label("➡ ");
             ui.label(format!("{}°C", self.pelt_temp_1));
-            if ui.button("Simulate Update").clicked() {
-                self.update_pelt_temp(1, 25); // Example temperature
-            }
+        //    if ui.button("Simulate Update").clicked() {
+          //      self.update_pelt_temp(1, 25); // Example temperature
+            // }
         });
         
         ui.horizontal(|ui| {
