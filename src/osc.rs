@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use rosc::{OscPacket, OscType};
 
-pub async fn osc_listener(addr: &str, sender: Sender<i8>) {
+pub async fn osc_listener(addr: &str, sender: Sender<(i8, i8)>) {
     let usage = format!("Usage: {} IP:PORT", addr);
 
     let socket_addr = match SocketAddrV4::from_str(addr) {
@@ -38,14 +38,27 @@ pub async fn osc_listener(addr: &str, sender: Sender<i8>) {
     }
 }
 
-fn handle_packet(packet: OscPacket, sender: &Sender<i8>) {
+fn handle_packet(packet: OscPacket, sender: &Sender<(i8, i8)>) {
     match packet {
         OscPacket::Message(msg) => {
             println!("OSC address: {}", msg.addr);
             if let Some(OscType::Float(value)) = msg.args.first() {
                 println!("OSC Value: {}", value);
                 let int_value = (*value * 100.0) as i8; // Convert f32 to i8 FOR TESTING. if we use ints, this needs to be updated. TODO:
-                sender.send(int_value).unwrap(); 
+                let id: i8; // Peltier id. We are only using Pelt1 and Pelt2 for now. - David
+                match msg.addr.as_str(){
+                    "/Pelt1" => id = 0,
+                    "/Pelt2" => id = 1,
+                    "/Pelt3" => id = 2,
+                    "/Pelt4" => id = 3,
+                    "/Pelt5" => id = 4,
+                    "/Pelt6" => id = 5,
+                    "/Pelt7" => id = 6,
+                    "/Pelt8" => id = 7,
+                    _ => id = 0,
+                }
+                let address_msg_tuple: (i8, i8) = (id, int_value);
+                sender.send(address_msg_tuple).unwrap(); 
       //          println!("Scaled {}", int_value);
             }
         }

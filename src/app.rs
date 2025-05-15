@@ -24,8 +24,9 @@ pub struct TemplateApp {
     pub is_running: bool,
     pub esp_port_1: String,
     pub pelt_temp_1: i8,
+    pub pelt_temp_2: i8,
     #[serde(skip)]
-    pub osc_receiver: Receiver<i8>, // Channel receiver for OSC updates
+    pub osc_receiver: Receiver<(i8, i8)>, // Channel receiver for OSC updates. First i8 is id for Pelier number. Second i8 is temperature value - David
     #[serde(skip)]
     pub last_update_time: std::time::Instant,
     #[serde(skip)]
@@ -44,6 +45,7 @@ impl Default for TemplateApp {
             is_running: false,
             esp_port_1: "COM1".to_owned(),
             pelt_temp_1: 0,
+            pelt_temp_2: 0,
             last_update_time: std::time::Instant::now(),
             osc_receiver, // Initialize the receiver
             current_page: Page::Home, // Default to home page
@@ -53,7 +55,22 @@ impl Default for TemplateApp {
 
 impl TemplateApp {
     pub fn update_pelt_temp(&mut self, _id: i8, temp: i8) {
-        self.pelt_temp_1 = temp;
+        match _id {
+            0 => self.pelt_temp_1 = temp,
+            1 => self.pelt_temp_2 = temp,
+            // TODO: control each Peltier's temperature by their id - David
+            /*
+            2 => ,
+            3 => ,
+            4 => ,
+            5 => ,
+            6 => ,
+            7 => , */
+            _ => {
+                eprintln!("Invalid _id: {}. Defaulting to pelt_temp_1", _id);
+                self.pelt_temp_1 = temp;
+            },
+        }
     }
 
     /// Called once before the first frame.
@@ -92,8 +109,12 @@ impl TemplateApp {
             ui.label("ON");
             ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY);
             ui.label("Temp:");
-            ui.label("23C");
-            ui.label("➡ 30C");
+            ui.label("25C");
+            ui.label("➡ ");
+            ui.label(format!("{}°C", self.pelt_temp_2));
+            // if ui.button("Simulate Update").clicked() {
+            //     self.update_pelt_temp(1, 25); // Example temperature
+            // }
         });
         
         ui.separator();
@@ -212,8 +233,8 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Process any incoming OSC messages
-        if let Ok(temp) = self.osc_receiver.try_recv() {
-            self.update_pelt_temp(1, temp); // Update the temperature
+        if let Ok(osc_id_and_message) = self.osc_receiver.try_recv() {
+            self.update_pelt_temp(osc_id_and_message.0, osc_id_and_message.1); // Update the temperature. First value is id, second value is temperature
             ctx.request_repaint(); // Force the GUI to refresh
         }
 
