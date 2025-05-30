@@ -7,6 +7,7 @@
 
 mod osc;
 mod app;
+mod esp_comm; 
 use crate::osc::osc_listener;
 use std::sync::mpsc::{self};
 
