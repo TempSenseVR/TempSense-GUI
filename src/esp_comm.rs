@@ -29,12 +29,11 @@ pub fn esp_worker_thread(
     status_tx: Sender<EspStatus>,
 ) {
     let mut serial_port: Option<Box<dyn SerialPort>> = None;
-    let mut read_buffer: [u8; 1024] = [0; 1024]; // Buffer for reading serial data
+    let mut read_buffer: [u8; 1024] = [0; 1024];
 
     loop {
         match command_rx.try_recv() {
             Ok(cmd) => {
-                // Process command
                 match cmd {
                     EspCommand::Connect(port_name, baud_rate) => {
                         if serial_port.is_some() {
@@ -42,7 +41,7 @@ pub fn esp_worker_thread(
                             continue;
                         }
                         match serialport::new(&port_name, baud_rate)
-                            .timeout(Duration::from_millis(1000)) // Connection timeout
+                            .timeout(Duration::from_millis(1000))
                             .open()
                         {
                             Ok(port) => {
@@ -52,21 +51,26 @@ pub fn esp_worker_thread(
                             Err(e) => {
                                 serial_port = None;
                                 status_tx.send(EspStatus::Error(format!("Failed to connect to {}: {}", port_name, e))).ok();
+                                // No break needed here as the thread didn't establish a working state to break from.
                             }
                         }
                     }
                     EspCommand::SendCommand(command_str) => {
                         if let Some(port) = serial_port.as_mut() {
-                            let cmd_with_newline = format!("{}\n", command_str); // ESPs often expect a newline
+                            let cmd_with_newline = format!("{}\n", command_str);
                             if let Err(e) = port.write_all(cmd_with_newline.as_bytes()) {
-                                status_tx.send(EspStatus::Error(format!("Failed to send command: {}", e))).ok();
+                                let error_msg = format!("Failed to send command: {}. Disconnecting.", e);
+                                status_tx.send(EspStatus::Error(error_msg.clone())).ok();
+                                serial_port.take(); 
+                                status_tx.send(EspStatus::Disconnected(Some(error_msg))).ok();
+                                break;
                             } else {
                                 if let Err(e) = port.flush() {
-                                     status_tx.send(EspStatus::Error(format!("Failed to flush serial port: {}", e))).ok();
-                                } else {
-                                    // Optionally, confirm command was sent, or wait for an ACK if your ESP sends one.
-                                    // For now, just assume sent if no error.
-                                    // status_tx.send(EspStatus::Message(format!("Sent: {}", command_str))).ok();
+                                     let error_msg = format!("Failed to flush serial port: {}. Disconnecting.", e);
+                                     status_tx.send(EspStatus::Error(error_msg.clone())).ok();
+                                     serial_port.take(); 
+                                     status_tx.send(EspStatus::Disconnected(Some(error_msg))).ok();
+                                     break;
                                 }
                             }
                         } else {
@@ -74,21 +78,26 @@ pub fn esp_worker_thread(
                         }
                     }
                     EspCommand::Disconnect => {
-                        if serial_port.take().is_some() { // take() consumes the value, effectively dropping/closing the port
+                        if serial_port.take().is_some() { 
                             status_tx.send(EspStatus::Disconnected(Some("Disconnected by user.".to_string()))).ok();
                         } else {
                             status_tx.send(EspStatus::Message("Already disconnected.".to_string())).ok();
                         }
+                        // If Disconnect command is from GUI, GUI expects worker to stop.
+                        // The worker does this by no longer having a serial_port.
+                        // To fully stop the thread, StopThread is preferred.
+                        // However, after user disconnect, the main app will likely drop sender or send StopThread.
+                        // For now, let's assume this is sufficient, or let StopThread handle full exit.
+                        // If this command should also stop the thread, add 'break;'
                     }
                     EspCommand::StopThread => {
-                        serial_port.take(); // Ensure port is closed
+                        serial_port.take(); 
                         status_tx.send(EspStatus::Disconnected(Some("ESP worker thread stopped.".to_string()))).ok();
                         break; // Exit the loop, thread will terminate
                     }
                 }
             }
             Err(TryRecvError::Empty) => {
-                // No command from GUI, try to read from serial if connected
                 if let Some(port) = serial_port.as_mut() {
                     match port.read(&mut read_buffer) {
                         Ok(bytes_read) if bytes_read > 0 => {
@@ -100,23 +109,20 @@ pub fn esp_worker_thread(
                             // This is expected with a read timeout if no data is available
                         }
                         Err(e) => {
-                            // Handle other read errors (e.g., device disconnected)
-                            status_tx.send(EspStatus::Error(format!("Serial read error: {}. Disconnecting.", e))).ok();
-                            serial_port.take(); // Close the port
-                            status_tx.send(EspStatus::Disconnected(Some(format!("Disconnected due to read error: {}", e)))).ok();
-
+                            let error_msg = format!("Serial read error: {}. Disconnecting.", e);
+                            status_tx.send(EspStatus::Error(error_msg.clone())).ok();
+                            serial_port.take(); 
+                            status_tx.send(EspStatus::Disconnected(Some(error_msg))).ok();
+                            break;
                         }
                     }
                 }
             }
             Err(TryRecvError::Disconnected) => {
-                // GUI thread likely closed, or sender was dropped.
-                serial_port.take(); // Ensure port is closed
-                break; // Exit the loop
+                serial_port.take(); 
+                break; 
             }
         }
-        // Small sleep to prevent the loop from spinning too fast when idle and using try_recv
-        // Adjust based on responsiveness needs and serial read behavior
         thread::sleep(Duration::from_millis(20));
     }
 }

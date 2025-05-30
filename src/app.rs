@@ -352,7 +352,6 @@ impl TemplateApp {
         ui.label(&self.esp_status_message_2);
 
         ui.separator();
-        
         ui.horizontal(|ui| {
             ui.label("Manual Pelt 1 temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_1_temp_str).desired_width(50.0));
@@ -373,8 +372,6 @@ impl TemplateApp {
 
         ui.horizontal(|ui| {
             ui.label("Manual Pelt 2 temp: ");
-            // Assumes `manual_pelt_2_temp_str: String` exists in `TemplateApp`
-            // and is initialized (e.g., in `Default::default()`).
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_2_temp_str).desired_width(50.0));
 
             if ui.button("Set Temp").clicked() { // Button is now always enabled
@@ -384,12 +381,7 @@ impl TemplateApp {
                     
                     // Log the manual update.
                     self.add_esp_log_message("APP", format!("Manual override: Peltier 2 target directly set to {}°C", temp_val));
-                    
-                    // Note: The existing logic in your `render_home_page` function:
-                    //   if self.esp_connected_2 && self.pelt_temp_2 != self.pelt_temp_2_old { ... }
-                    // will still be responsible for actually sending this temperature
-                    // to the ESP if it's connected and the value has changed.
-                    // This change here only makes the button directly modify `self.pelt_temp_2`.
+
                 } else {
                     self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 2: '{}'", self.manual_pelt_2_temp_str));
                 }
@@ -475,9 +467,7 @@ impl TemplateApp {
                      self.add_esp_log_message("ESP1", format!("Failed to send connect cmd: {}",e));
                      self.esp_command_sender_1 = None;
                      self.esp_status_receiver_1 = None;
-                     if let Some(handle) = self.esp_thread_handle_1.take() {
-                        let _ = handle.join().map_err(|join_err| self.add_esp_log_message("ESP1", format!("Error joining ESP1 thread: {:?}", join_err)));
-                     }
+                     self.esp_thread_handle_1.take();
                 } else {
                     self.esp_status_message_1 = connect_msg.clone();
                     self.add_esp_log_message("ESP1", connect_msg);
@@ -563,9 +553,7 @@ impl TemplateApp {
                      self.add_esp_log_message("ESP2", format!("Failed to send connect cmd: {}",e));
                      self.esp_command_sender_2 = None;
                      self.esp_status_receiver_2 = None;
-                     if let Some(handle) = self.esp_thread_handle_2.take() {
-                        let _ = handle.join().map_err(|join_err| self.add_esp_log_message("ESP2", format!("Error joining ESP2 thread: {:?}", join_err)));
-                     }
+                     self.esp_thread_handle_2.take();
                 } else {
                     self.esp_status_message_2 = connect_msg.clone();
                     self.add_esp_log_message("ESP2", connect_msg);
@@ -807,25 +795,27 @@ impl eframe::App for TemplateApp {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.add_esp_log_message("APP", "Application exiting. Stopping ESP workers.".to_string());
+        
+        // ESP 1 shutdown
         if let Some(sender) = self.esp_command_sender_1.take() {
-            let _ = sender.send(EspCommand::StopThread).map_err(|e| self.add_esp_log_message("ESP1", format!("Error sending StopThread: {}", e)));
+            // Attempt to send StopThread, ignore error if channel already closed (e.g., worker already exited)
+            let _ = sender.send(EspCommand::StopThread); 
         }
         if let Some(handle) = self.esp_thread_handle_1.take() {
-            if let Err(e) = handle.join().map_err(|e| format!("ESP1 thread panicked during exit: {:?}", e)) {
+           
+            if let Err(e) = handle.join().map_err(|e_join| format!("ESP1 thread panicked or error on join: {:?}", e_join)) {
                 self.add_esp_log_message("ESP1", e); 
-            } else {
-                 self.add_esp_log_message("ESP1", "Worker thread joined successfully.".to_string());
             }
         }
 
+        // ESP 2 shutdown
         if let Some(sender) = self.esp_command_sender_2.take() {
-            let _ = sender.send(EspCommand::StopThread).map_err(|e| self.add_esp_log_message("ESP2", format!("Error sending StopThread: {}", e)));
+            let _ = sender.send(EspCommand::StopThread);
         }
         if let Some(handle) = self.esp_thread_handle_2.take() {
-            if let Err(e) = handle.join().map_err(|e| format!("ESP2 thread panicked during exit: {:?}", e)) {
+        
+            if let Err(e) = handle.join().map_err(|e_join| format!("ESP2 thread panicked or error on join: {:?}", e_join)) {
                 self.add_esp_log_message("ESP2", e);
-            } else {
-                 self.add_esp_log_message("ESP2", "Worker thread joined successfully.".to_string());
             }
         }
     }
