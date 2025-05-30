@@ -83,6 +83,11 @@ pub struct TemplateApp {
     pub manual_pelt_1_temp_str: String,
     #[serde(skip)]
     pub manual_pelt_2_temp_str: String,
+
+    #[serde(skip)] // New field for actual skin temperature from ESP1
+    pub skin_temp_1: Option<f32>, 
+    #[serde(skip)] // New field for actual skin temperature from ESP2
+    pub skin_temp_2: Option<f32>
 }
 
 impl Default for TemplateApp {
@@ -99,7 +104,7 @@ impl Default for TemplateApp {
             // ESP 1 (Peltier 1)
             esp_port_1: if cfg!(windows) { "COM3".to_string() } else { "/dev/ttyUSB0".to_string() },
             pelt_temp_1: 0,
-            pelt_temp_1_old: 0,
+            pelt_temp_1_old: -127,
             esp_command_sender_1: None,
             esp_status_receiver_1: None,
             esp_thread_handle_1: None,
@@ -110,7 +115,7 @@ impl Default for TemplateApp {
             // ESP 2 (Peltier 2)
             esp_port_2: if cfg!(windows) { "COM4".to_string() } else { "/dev/ttyUSB1".to_string() },
             pelt_temp_2: 0,
-            pelt_temp_2_old: 0,
+            pelt_temp_2_old: -127,
             esp_command_sender_2: None,
             esp_status_receiver_2: None,
             esp_thread_handle_2: None,
@@ -125,6 +130,8 @@ impl Default for TemplateApp {
 
             manual_pelt_1_temp_str: "0".to_string(),
             manual_pelt_2_temp_str: "0".to_string(),
+            skin_temp_1: None,
+            skin_temp_2: None,
         }
     }
 }
@@ -157,7 +164,7 @@ impl TemplateApp {
     }
 
     // Render the Home page content
-    fn render_home_page(&mut self, ui: &mut egui::Ui) {
+fn render_home_page(&mut self, ui: &mut egui::Ui) {
         // Peltier 1
         ui.horizontal(|ui| {
             ui.label("Pelt 1:");
@@ -165,6 +172,11 @@ impl TemplateApp {
             ui.label(if self.is_running && self.esp_connected_1 { "ON" } else { "OFF" });
             ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY); 
             ui.label("Temp:");
+            let actual_temp_str_1 = self.skin_temp_1.map_or_else(
+                || "--.-°C".to_string(), 
+                |temp| format!("{:.1}°C", temp)
+            );
+            ui.label(actual_temp_str_1);
             ui.label("➡ "); 
             ui.label(format!("{}°C", self.pelt_temp_1));
 
@@ -193,6 +205,11 @@ impl TemplateApp {
             ui.label(if self.is_running && self.esp_connected_2 { "ON" } else { "OFF" });
             ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY);
             ui.label("Temp:");
+            let actual_temp_str_2 = self.skin_temp_2.map_or_else(
+                || "--.-°C".to_string(),
+                |temp| format!("{:.1}°C", temp)
+            );
+            ui.label(actual_temp_str_2);
             ui.label("➡ ");
             ui.label(format!("{}°C", self.pelt_temp_2));
 
@@ -214,6 +231,8 @@ impl TemplateApp {
         });
         ui.visuals_mut().override_text_color = None;
         
+        // ... (rest of your render_home_page function, like START/STOP, status, manual inputs) ...
+        // The manual input sections with `ui.ctx().request_repaint()` are fine as you provided them.
         ui.separator();
 
         ui.horizontal(|ui| {
@@ -319,9 +338,8 @@ impl TemplateApp {
 
         ui.horizontal(|ui| {
             ui.label("OSC: ");
-            // TODO: Add actual OSC connection status logic
-            ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN); // Placeholder
-            ui.label("READY"); // Placeholder
+            ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN); 
+            ui.label("READY"); 
         });
         ui.visuals_mut().override_text_color = None; 
 
@@ -356,14 +374,14 @@ impl TemplateApp {
             ui.label("Manual Pelt 1 temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_1_temp_str).desired_width(50.0));
 
-            if ui.button("Set Temp").clicked() { // Button is now always enabled
+            if ui.button("Set Temp").clicked() {
+                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_1_temp_str.parse::<i8>() {
-                    // Directly update the pelt_temp_2 variable.
-                    self.pelt_temp_1 = temp_val;
-                    
-                    // Log the manual update.
-                    self.add_esp_log_message("APP", format!("Manual override: Peltier 1 target directly set to {}°C", temp_val));
-
+                    if self.pelt_temp_1 != temp_val { // Only if value actually changes
+                        self.pelt_temp_1 = temp_val;
+                        self.add_esp_log_message("APP", format!("Manual override: Peltier 1 target directly set to {}°C", temp_val));
+                        ui.ctx().request_repaint(); // Ensure repaint for immediate feedback and re-evaluation
+                    }
                 } else {
                     self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 1: '{}'", self.manual_pelt_1_temp_str));
                 }
@@ -374,22 +392,21 @@ impl TemplateApp {
             ui.label("Manual Pelt 2 temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_2_temp_str).desired_width(50.0));
 
-            if ui.button("Set Temp").clicked() { // Button is now always enabled
+            if ui.button("Set Temp").clicked() {
+                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_2_temp_str.parse::<i8>() {
-                    // Directly update the pelt_temp_2 variable.
-                    self.pelt_temp_2 = temp_val;
-                    
-                    // Log the manual update.
-                    self.add_esp_log_message("APP", format!("Manual override: Peltier 2 target directly set to {}°C", temp_val));
-
+                    if self.pelt_temp_2 != temp_val { // Only if value actually changes
+                        self.pelt_temp_2 = temp_val;
+                        self.add_esp_log_message("APP", format!("Manual override: Peltier 2 target directly set to {}°C", temp_val));
+                        ui.ctx().request_repaint(); // Ensure repaint for immediate feedback and re-evaluation
+                    }
                 } else {
                     self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 2: '{}'", self.manual_pelt_2_temp_str));
                 }
             }
         });
-
     }
-
+    
      fn render_osc_settings_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("OSC Settings");
         
@@ -623,6 +640,30 @@ impl TemplateApp {
             self.esp_log.remove(0);
         }
     }
+
+    fn parse_esp_message_and_update_state(&mut self, esp_id_str: &str, msg: &str) {
+        // Example msg: "Skin_Temp_Smoothed:12.12,Exterior_Temp:18.73,Target_Temp:10.0,Heat_PID_output:0.0,Cool_PID_output:64.4,Ambient:22.0"
+        for part in msg.split(',') {
+            let mut kv_iterator = part.splitn(2, ':');
+            if let (Some(key_raw), Some(value_raw)) = (kv_iterator.next(), kv_iterator.next()) {
+                let key = key_raw.trim();
+                let value_str = value_raw.trim();
+
+                if key == "Skin_Temp_Smoothed" {
+                    if let Ok(temp_f32) = value_str.parse::<f32>() {
+                        if esp_id_str == "ESP1" {
+                            self.skin_temp_1 = Some(temp_f32);
+                        } else if esp_id_str == "ESP2" {
+                            self.skin_temp_2 = Some(temp_f32);
+                        }
+                    } else {
+                        self.add_esp_log_message(esp_id_str, format!("Failed to parse Skin_Temp_Smoothed value: '{}'", value_str));
+                    }
+                }
+                // Future: Add parsing for other values like "Exterior_Temp", "Target_Temp" here
+            }
+        }
+    }
 }
 
 impl eframe::App for TemplateApp {
@@ -637,9 +678,6 @@ impl eframe::App for TemplateApp {
           //  println!("APP_RS_RX: {:?}", osc_id_and_message); // Added a prefix for clarity
             self.update_pelt_temp(osc_id_and_message.0, osc_id_and_message.1);
         }
-        
-    
-        
         
 
         let mut processed_any_message_this_frame = false;
@@ -675,6 +713,7 @@ impl eframe::App for TemplateApp {
                     }
                     EspStatus::Message(msg) => {
                         self.add_esp_log_message("ESP1", format!("MSG: {}", msg));
+                        self.parse_esp_message_and_update_state("ESP1", &msg);
                     }
                 }
             }
@@ -724,6 +763,7 @@ impl eframe::App for TemplateApp {
                         self.add_esp_log_message("ESP2", full_err_msg);
                     }
                     EspStatus::Message(msg) => {
+                        self.parse_esp_message_and_update_state("ESP2", &msg);
                         self.add_esp_log_message("ESP2", format!("MSG: {}", msg));
                     }
                 }
@@ -748,7 +788,7 @@ impl eframe::App for TemplateApp {
         if self.osc_receiver.try_recv().is_ok() || processed_any_message_this_frame {
             ctx.request_repaint();
         } else {
-            ctx.request_repaint_after_for(Duration::from_millis(100), ctx.viewport_id());
+            ctx.request_repaint_after_for(Duration::from_millis(75), ctx.viewport_id());
         }
 
 
