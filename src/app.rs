@@ -36,6 +36,7 @@ pub struct TemplateApp {
     
     // ESP 1 (Peltier 1)
     pub esp_port_1: String, 
+    #[serde(skip)]
     pub pelt_temp_1: i8,
     #[serde(skip)]
     pub pelt_temp_1_old: i8,
@@ -53,6 +54,7 @@ pub struct TemplateApp {
 
     // ESP 2 (Peltier 2)
     pub esp_port_2: String, 
+    #[serde(skip)]
     pub pelt_temp_2: i8,
     #[serde(skip)]
     pub pelt_temp_2_old: i8,
@@ -74,9 +76,13 @@ pub struct TemplateApp {
     pub last_update_time: std::time::Instant,
     #[serde(skip)]
     pub current_page: Page,
-
     #[serde(skip)]
     pub esp_log: Vec<String>, // Shared log for messages from ESPs and app
+
+    #[serde(skip)]
+    pub manual_pelt_1_temp_str: String,
+    #[serde(skip)]
+    pub manual_pelt_2_temp_str: String,
 }
 
 impl Default for TemplateApp {
@@ -116,6 +122,9 @@ impl Default for TemplateApp {
             osc_receiver,
             current_page: Page::Home,
             esp_log: Vec::new(),
+
+            manual_pelt_1_temp_str: "0".to_string(),
+            manual_pelt_2_temp_str: "0".to_string(),
         }
     }
 }
@@ -123,12 +132,19 @@ impl Default for TemplateApp {
 impl TemplateApp {
     pub fn update_pelt_temp(&mut self, _id: i8, temp: i8) {
         match _id {
-            0 => self.pelt_temp_1 = temp,
-            1 => self.pelt_temp_2 = temp,
+            0 => {
+                self.pelt_temp_1 = temp;
+                println!("OSC temp update for Peltier 0: {:?}", temp); // Added print here
+            },
+            1 => {
+                self.pelt_temp_2 = temp;
+                println!("OSC temp update for Peltier 1: {:?}", temp); // Added print here
+            },
             _ => {
-                // Log this to the ESP log for visibility in UI
+                // This is for invalid _id
+                println!("OSC temp received with INVALID _id ({}): {:?}. Defaulting to pelt_temp_1", _id, temp);
                 self.add_esp_log_message("APP", format!("Invalid peltier _id: {}. Defaulting to pelt_temp_1", _id));
-                self.pelt_temp_1 = temp; // Or handle error appropriately
+                self.pelt_temp_1 = temp;
             },
         }
     }
@@ -203,25 +219,25 @@ impl TemplateApp {
         ui.horizontal(|ui| {
             if ui.button("START ▶").clicked() {
                 self.is_running = true;
-                let mut S1_msg_set = false;
-                let mut S2_msg_set = false;
+                let mut s1_msg_set = false;
+                let mut s2_msg_set = false;
 
                 if self.esp_connected_1 {
                     if let Some(sender) = &self.esp_command_sender_1 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 1".to_string())) {
                             self.esp_status_message_1 = format!("ESP1: Error sending START: {}", e);
                             self.add_esp_log_message("ESP1", format!("Error sending START: {}", e));
-                            S1_msg_set = true;
+                            s1_msg_set = true;
                         } else {
                              self.esp_status_message_1 = "ESP1: START command sent.".to_string();
                              self.add_esp_log_message("ESP1", "START command sent.".to_string());
-                             S1_msg_set = true;
+                             s1_msg_set = true;
                         }
                     }
                 } else {
                     self.esp_status_message_1 = "ESP1: Cannot START, not connected.".to_string();
                     self.add_esp_log_message("ESP1", "Attempted START while ESP1 not connected.".to_string());
-                    S1_msg_set = true;
+                    s1_msg_set = true;
                 }
 
                 if self.esp_connected_2 {
@@ -229,42 +245,42 @@ impl TemplateApp {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 1".to_string())) {
                             self.esp_status_message_2 = format!("ESP2: Error sending START: {}", e);
                             self.add_esp_log_message("ESP2", format!("Error sending START: {}", e));
-                            S2_msg_set = true;
+                            s2_msg_set = true;
                         } else {
                              self.esp_status_message_2 = "ESP2: START command sent.".to_string();
                              self.add_esp_log_message("ESP2", "START command sent.".to_string());
-                             S2_msg_set = true;
+                             s2_msg_set = true;
                         }
                     }
                 } else {
                     self.esp_status_message_2 = "ESP2: Cannot START, not connected.".to_string();
                     self.add_esp_log_message("ESP2", "Attempted START while ESP2 not connected.".to_string());
-                    S2_msg_set = true;
+                    s2_msg_set = true;
                 }
-                 if !S1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
-                 if !S2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
+                 if !s1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
+                 if !s2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
             }
             if ui.button("STOP ALL ■").clicked() {
                 self.is_running = false;
-                let mut S1_msg_set = false;
-                let mut S2_msg_set = false;
+                let mut s1_msg_set = false;
+                let mut s2_msg_set = false;
 
                 if self.esp_connected_1 {
                     if let Some(sender) = &self.esp_command_sender_1 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 0".to_string())) {
                             self.esp_status_message_1 = format!("ESP1: Error sending STOP: {}", e);
                             self.add_esp_log_message("ESP1", format!("Error sending STOP: {}",e));
-                            S1_msg_set = true;
+                            s1_msg_set = true;
                         } else {
                             self.esp_status_message_1 = "ESP1: STOP command sent.".to_string();
                             self.add_esp_log_message("ESP1", "STOP command sent.".to_string());
-                            S1_msg_set = true;
+                            s1_msg_set = true;
                         }
                     }
                 } else {
                     self.esp_status_message_1 = "ESP1: Cannot STOP, not connected.".to_string();
                     self.add_esp_log_message("ESP1", "Attempted STOP while ESP1 not connected.".to_string());
-                    S1_msg_set = true;
+                    s1_msg_set = true;
                 }
 
                 if self.esp_connected_2 {
@@ -272,20 +288,20 @@ impl TemplateApp {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 0".to_string())) {
                             self.esp_status_message_2 = format!("ESP2: Error sending STOP: {}", e);
                             self.add_esp_log_message("ESP2", format!("Error sending STOP: {}",e));
-                            S2_msg_set = true;
+                            s2_msg_set = true;
                         } else {
                             self.esp_status_message_2 = "ESP2: STOP command sent.".to_string();
                             self.add_esp_log_message("ESP2", "STOP command sent.".to_string());
-                            S2_msg_set = true;
+                            s2_msg_set = true;
                         }
                     }
                 } else {
                     self.esp_status_message_2 = "ESP2: Cannot STOP, not connected.".to_string();
                     self.add_esp_log_message("ESP2", "Attempted STOP while ESP2 not connected.".to_string());
-                    S2_msg_set = true;
+                    s2_msg_set = true;
                 }
-                if !S1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
-                if !S2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
+                if !s1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
+                if !s2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
             }
         });
 
@@ -305,7 +321,7 @@ impl TemplateApp {
             ui.label("OSC: ");
             // TODO: Add actual OSC connection status logic
             ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN); // Placeholder
-            ui.label("CONNECTED"); // Placeholder
+            ui.label("READY"); // Placeholder
         });
         ui.visuals_mut().override_text_color = None; 
 
@@ -334,6 +350,52 @@ impl TemplateApp {
         });
         ui.visuals_mut().override_text_color = None; 
         ui.label(&self.esp_status_message_2);
+
+        ui.separator();
+        
+        ui.horizontal(|ui| {
+            ui.label("Manual Pelt 1 temp: ");
+            ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_1_temp_str).desired_width(50.0));
+
+            if ui.button("Set Temp").clicked() { // Button is now always enabled
+                if let Ok(temp_val) = self.manual_pelt_1_temp_str.parse::<i8>() {
+                    // Directly update the pelt_temp_2 variable.
+                    self.pelt_temp_1 = temp_val;
+                    
+                    // Log the manual update.
+                    self.add_esp_log_message("APP", format!("Manual override: Peltier 1 target directly set to {}°C", temp_val));
+
+                } else {
+                    self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 1: '{}'", self.manual_pelt_1_temp_str));
+                }
+            }
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Manual Pelt 2 temp: ");
+            // Assumes `manual_pelt_2_temp_str: String` exists in `TemplateApp`
+            // and is initialized (e.g., in `Default::default()`).
+            ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_2_temp_str).desired_width(50.0));
+
+            if ui.button("Set Temp").clicked() { // Button is now always enabled
+                if let Ok(temp_val) = self.manual_pelt_2_temp_str.parse::<i8>() {
+                    // Directly update the pelt_temp_2 variable.
+                    self.pelt_temp_2 = temp_val;
+                    
+                    // Log the manual update.
+                    self.add_esp_log_message("APP", format!("Manual override: Peltier 2 target directly set to {}°C", temp_val));
+                    
+                    // Note: The existing logic in your `render_home_page` function:
+                    //   if self.esp_connected_2 && self.pelt_temp_2 != self.pelt_temp_2_old { ... }
+                    // will still be responsible for actually sending this temperature
+                    // to the ESP if it's connected and the value has changed.
+                    // This change here only makes the button directly modify `self.pelt_temp_2`.
+                } else {
+                    self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 2: '{}'", self.manual_pelt_2_temp_str));
+                }
+            }
+        });
+
     }
 
      fn render_osc_settings_page(&mut self, ui: &mut egui::Ui) {
@@ -362,7 +424,7 @@ impl TemplateApp {
             ui.label("OSC Status:");
             // TODO: Implement actual OSC connection status logic
             ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN); // Placeholder
-            ui.label("CONNECTED"); // Placeholder
+            ui.label("READY"); // Placeholder
         });
         ui.visuals_mut().override_text_color = None; 
     }
@@ -582,9 +644,15 @@ impl eframe::App for TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Process incoming OSC messages
-        if let Ok(osc_id_and_message) = self.osc_receiver.try_recv() {
+// Process ALL available OSC messages this frame
+        while let Ok(osc_id_and_message) = self.osc_receiver.try_recv() {
+          //  println!("APP_RS_RX: {:?}", osc_id_and_message); // Added a prefix for clarity
             self.update_pelt_temp(osc_id_and_message.0, osc_id_and_message.1);
         }
+        
+    
+        
+        
 
         let mut processed_any_message_this_frame = false;
 

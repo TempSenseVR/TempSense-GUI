@@ -46,7 +46,8 @@ fn handle_packet(packet: OscPacket, sender: &Sender<(i8, i8)>) {
                 println!("OSC Value: {}", value);
                 let int_value = (*value * 100.0) as i8; // Convert f32 to i8 FOR TESTING. if we use ints, this needs to be updated. TODO:
                 let id: i8; // Peltier id. We are only using Pelt1 and Pelt2 for now. - David
-                match msg.addr.as_str(){
+                let addr_str = msg.addr.as_str();
+                match addr_str {
                     "/Pelt1" => id = 0,
                     "/Pelt2" => id = 1,
                     "/Pelt3" => id = 2,
@@ -55,11 +56,15 @@ fn handle_packet(packet: OscPacket, sender: &Sender<(i8, i8)>) {
                     "/Pelt6" => id = 5,
                     "/Pelt7" => id = 6,
                     "/Pelt8" => id = 7,
-                    _ => id = 0,
+                    _      => {
+                        println!("[osc.rs] WARNING: Address '{}' did not match specific /PeltX. Defaulting id to 0.", addr_str);
+                        id = 0;
+                    }
                 }
+
                 let address_msg_tuple: (i8, i8) = (id, int_value);
                 sender.send(address_msg_tuple).unwrap(); 
-      //          println!("Scaled {}", int_value);
+             //   println!("Scaled {:?}", address_msg_tuple);
             }
         }
         OscPacket::Bundle(bundle) => {
