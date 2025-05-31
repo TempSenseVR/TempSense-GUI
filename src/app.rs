@@ -84,10 +84,15 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub manual_pelt_2_temp_str: String,
 
-    #[serde(skip)] // New field for actual skin temperature from ESP1
+    #[serde(skip)]
     pub skin_temp_1: Option<f32>, 
-    #[serde(skip)] // New field for actual skin temperature from ESP2
-    pub skin_temp_2: Option<f32>
+    #[serde(skip)] 
+    pub skin_temp_2: Option<f32>,
+
+    #[serde(skip)]
+    pub manual_pelt_1: bool,
+    #[serde(skip)]
+    pub manual_pelt_2: bool
 }
 
 impl Default for TemplateApp {
@@ -132,6 +137,8 @@ impl Default for TemplateApp {
             manual_pelt_2_temp_str: "0".to_string(),
             skin_temp_1: None,
             skin_temp_2: None,
+            manual_pelt_1: false,
+            manual_pelt_2: false
         }
     }
 }
@@ -140,12 +147,17 @@ impl TemplateApp {
     pub fn update_pelt_temp(&mut self, _id: i8, temp: i8) {
         match _id {
             0 => {
-                self.pelt_temp_1 = temp;
-                println!("OSC temp update for Peltier 0: {:?}", temp); // Added print here
+                if self.manual_pelt_1 != true {
+                    self.pelt_temp_1 = temp;
+                    println!("OSC temp update for Peltier 0: {:?}", temp); // Added print here
+                }
             },
             1 => {
-                self.pelt_temp_2 = temp;
-                println!("OSC temp update for Peltier 1: {:?}", temp); // Added print here
+                if self.manual_pelt_2 != true {
+                    self.pelt_temp_2 = temp;
+                    println!("OSC temp update for Peltier 1: {:?}", temp); // Added print here
+                }
+
             },
             _ => {
                 // This is for invalid _id
@@ -386,6 +398,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                     self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 1: '{}'", self.manual_pelt_1_temp_str));
                 }
             }
+            ui.checkbox(&mut self.manual_pelt_1, "Override OSC");
         });
 
         ui.horizontal(|ui| {
@@ -404,6 +417,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                     self.add_esp_log_message("APP", format!("Invalid temperature input for Peltier 2: '{}'", self.manual_pelt_2_temp_str));
                 }
             }
+            ui.checkbox(&mut self.manual_pelt_2, "Override OSC");
         });
     }
     
