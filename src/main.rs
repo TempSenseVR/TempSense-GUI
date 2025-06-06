@@ -32,14 +32,14 @@ fn main() -> eframe::Result {
             ),
         ..Default::default()
     };
-    
+
     let app = app::TemplateApp {
         osc_receiver: receiver,
         ..Default::default()
     };
     
     eframe::run_native(
-        "TempSense GUI",
+        "TempSense GUI v0.2",
         native_options,
         Box::new(|cc| {
 
