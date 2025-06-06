@@ -8,6 +8,54 @@
       inherit system;
     };
   in {
+    packages = forAllSystems (system: let
+        pkgs = pkgsFor system;
+      in {
+        tempsense = pkgs.rustPlatform.buildRustPackage rec {
+          pname = "tempsense";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            rustc
+            cargo
+          ];
+
+          buildInputs = with pkgs; [
+            wayland
+            udev openssl
+
+            # GUI libs
+            fontconfig
+            libGL libxkbcommon
+
+            # X11 libs
+            xorg.libXi xorg.libX11
+            xorg.libXcursor xorg.libXrandr
+          ];
+
+          # Force linking so stuff can be dlopen'd
+          RUSTFLAGS = map (a: "-C link-arg=${a}") [
+            "-Wl,--push-state,--no-as-needed"
+            "-lwayland-client"
+            "-lxkbcommon"
+            "-lEGL"
+            "-Wl,--pop-state"
+          ];
+
+          meta = with pkgs.lib; {
+            license = licenses.mit;
+            platforms = platforms.linux;
+            homepage = "https://github.com/TempSenseVR/TempSense-GUI";
+          };
+        };
+      }
+    );
+
     devShells = forAllSystems (system: let
       pkgs = pkgsFor system;
     in {
