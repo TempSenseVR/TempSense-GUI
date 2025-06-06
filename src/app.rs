@@ -1,18 +1,11 @@
 // src/app.rs
 
-// Add these to your existing use statements
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-// If esp_comm.rs is in src, and your main.rs or lib.rs has `mod esp_comm;`
-// or if app.rs is a module itself, adjust path accordingly.
-// Assuming app.rs is in the same directory level as esp_comm.rs, and both are modules of main.rs/lib.rs:
-// pub mod esp_comm; // in main.rs or lib.rs
-// then in app.rs:
-use crate::esp_comm::{EspCommand, EspStatus, esp_worker_thread}; // Adjust path if needed
+use crate::esp_comm::{EspCommand, EspStatus, esp_worker_thread};
 
-// ... (your existing Page enum)
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Page {
     Home,
@@ -20,7 +13,6 @@ pub enum Page {
     EspConnection,
     AppSettings
 }
-
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -34,7 +26,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     pub is_running: bool,
     
-    // ESP L (Peltier 1)
+    // ESP 1 (Peltier 1)
     pub esp_port_1: String, 
     #[serde(skip)]
     pub pelt_temp_1: i8,
@@ -52,7 +44,7 @@ pub struct TemplateApp {
     pub esp_status_message_1: String,
     pub esp_baud_rate_1: u32,
 
-    // ESP R (Peltier 2)
+    // ESP 2 (Peltier 2)
     pub esp_port_2: String, 
     #[serde(skip)]
     pub pelt_temp_2: i8,
@@ -106,7 +98,7 @@ impl Default for TemplateApp {
             osc_port: "9000".to_owned(),
             is_running: false,
             
-            // ESP L (Peltier 1)
+            // ESP 1 (Peltier 1)
             esp_port_1: if cfg!(windows) { "COM3".to_string() } else { "/dev/ttyUSB0".to_string() },
             pelt_temp_1: 0,
             pelt_temp_1_old: -127,
@@ -114,10 +106,10 @@ impl Default for TemplateApp {
             esp_status_receiver_1: None,
             esp_thread_handle_1: None,
             esp_connected_1: false,
-            esp_status_message_1: "ESP L: Not connected.".to_string(),
+            esp_status_message_1: "ESP1: Not connected.".to_string(),
             esp_baud_rate_1: 115200,
 
-            // ESP R (Peltier 2)
+            // ESP 2 (Peltier 2)
             esp_port_2: if cfg!(windows) { "COM4".to_string() } else { "/dev/ttyUSB1".to_string() },
             pelt_temp_2: 0,
             pelt_temp_2_old: -127,
@@ -125,7 +117,7 @@ impl Default for TemplateApp {
             esp_status_receiver_2: None,
             esp_thread_handle_2: None,
             esp_connected_2: false,
-            esp_status_message_2: "ESP R: Not connected.".to_string(),
+            esp_status_message_2: "ESP2: Not connected.".to_string(),
             esp_baud_rate_2: 115200,
 
             last_update_time: std::time::Instant::now(),
@@ -196,15 +188,15 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 if let Some(sender) = &self.esp_command_sender_1 {
                     let command_to_send = format!("setTemp {}", self.pelt_temp_1);
                     if let Err(e) = sender.send(EspCommand::SendCommand(command_to_send.clone())) {
-                        self.esp_status_message_1 = format!("ESP L: Error sending command: {:?}", e);
-                        self.add_esp_log_message("ESP L", format!("Failed to send '{}': {:?}", command_to_send, e));
+                        self.esp_status_message_1 = format!("ESP1: Error sending command: {:?}", e);
+                        self.add_esp_log_message("ESP1", format!("Failed to send '{}': {:?}", command_to_send, e));
                     } else {
-                        self.add_esp_log_message("ESP L", format!("Sent command: {}", command_to_send));
+                        self.add_esp_log_message("ESP1", format!("Sent command: {}", command_to_send));
                     }
                 }
             } else if self.pelt_temp_1 != self.pelt_temp_1_old && !self.esp_connected_1 { // only log if temp changed
-                self.esp_status_message_1 = "ESP L: Not connected.".to_string();
-                self.add_esp_log_message("ESP L", "Attempted to send command while ESP L not connected.".to_string());
+                self.esp_status_message_1 = "ESP1: Not connected.".to_string();
+                self.add_esp_log_message("ESP1", "Attempted to send command while ESP1 not connected.".to_string());
             }
             self.pelt_temp_1_old = self.pelt_temp_1;
         });
@@ -229,22 +221,20 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 if let Some(sender) = &self.esp_command_sender_2 {
                     let command_to_send = format!("setTemp {}", self.pelt_temp_2);
                     if let Err(e) = sender.send(EspCommand::SendCommand(command_to_send.clone())) {
-                        self.esp_status_message_2 = format!("ESP R: Error sending command: {:?}", e);
-                        self.add_esp_log_message("ESP R", format!("Failed to send '{}': {:?}", command_to_send, e));
+                        self.esp_status_message_2 = format!("ESP2: Error sending command: {:?}", e);
+                        self.add_esp_log_message("ESP2", format!("Failed to send '{}': {:?}", command_to_send, e));
                     } else {
-                        self.add_esp_log_message("ESP R", format!("Sent command: {}", command_to_send));
+                        self.add_esp_log_message("ESP2", format!("Sent command: {}", command_to_send));
                     }
                 }
             } else if self.pelt_temp_2 != self.pelt_temp_2_old && !self.esp_connected_2 { // only log if temp changed
-                self.esp_status_message_2 = "ESP R: Not connected.".to_string();
-                self.add_esp_log_message("ESP R", "Attempted to send command while ESP R not connected.".to_string());
+                self.esp_status_message_2 = "ESP2: Not connected.".to_string();
+                self.add_esp_log_message("ESP2", "Attempted to send command while ESP2 not connected.".to_string());
             }
             self.pelt_temp_2_old = self.pelt_temp_2;
         });
         ui.visuals_mut().override_text_color = None;
-        
-        // ... (rest of your render_home_page function, like START/STOP, status, manual inputs) ...
-        // The manual input sections with `ui.ctx().request_repaint()` are fine as you provided them.
+
         ui.separator();
 
         ui.horizontal(|ui| {
@@ -256,40 +246,40 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 if self.esp_connected_1 {
                     if let Some(sender) = &self.esp_command_sender_1 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 1".to_string())) {
-                            self.esp_status_message_1 = format!("ESP L: Error sending START: {}", e);
-                            self.add_esp_log_message("ESP L", format!("Error sending START: {}", e));
+                            self.esp_status_message_1 = format!("ESP1: Error sending START: {}", e);
+                            self.add_esp_log_message("ESP1", format!("Error sending START: {}", e));
                             s1_msg_set = true;
                         } else {
-                             self.esp_status_message_1 = "ESP L: START command sent.".to_string();
-                             self.add_esp_log_message("ESP L", "START command sent.".to_string());
+                             self.esp_status_message_1 = "ESP1: START command sent.".to_string();
+                             self.add_esp_log_message("ESP1", "START command sent.".to_string());
                              s1_msg_set = true;
                         }
                     }
                 } else {
-                    self.esp_status_message_1 = "ESP L: Cannot START, not connected.".to_string();
-                    self.add_esp_log_message("ESP L", "Attempted START while ESP L not connected.".to_string());
+                    self.esp_status_message_1 = "ESP1: Cannot START, not connected.".to_string();
+                    self.add_esp_log_message("ESP1", "Attempted START while ESP1 not connected.".to_string());
                     s1_msg_set = true;
                 }
 
                 if self.esp_connected_2 {
                     if let Some(sender) = &self.esp_command_sender_2 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 1".to_string())) {
-                            self.esp_status_message_2 = format!("ESP R: Error sending START: {}", e);
-                            self.add_esp_log_message("ESP R", format!("Error sending START: {}", e));
+                            self.esp_status_message_2 = format!("ESP2: Error sending START: {}", e);
+                            self.add_esp_log_message("ESP2", format!("Error sending START: {}", e));
                             s2_msg_set = true;
                         } else {
-                             self.esp_status_message_2 = "ESP R: START command sent.".to_string();
-                             self.add_esp_log_message("ESP R", "START command sent.".to_string());
+                             self.esp_status_message_2 = "ESP2: START command sent.".to_string();
+                             self.add_esp_log_message("ESP2", "START command sent.".to_string());
                              s2_msg_set = true;
                         }
                     }
                 } else {
-                    self.esp_status_message_2 = "ESP R: Cannot START, not connected.".to_string();
-                    self.add_esp_log_message("ESP R", "Attempted START while ESP R not connected.".to_string());
+                    self.esp_status_message_2 = "ESP2: Cannot START, not connected.".to_string();
+                    self.add_esp_log_message("ESP2", "Attempted START while ESP2 not connected.".to_string());
                     s2_msg_set = true;
                 }
-                 if !s1_msg_set { self.esp_status_message_1 = "ESP L: Status unchanged.".to_string(); }
-                 if !s2_msg_set { self.esp_status_message_2 = "ESP R: Status unchanged.".to_string(); }
+                 if !s1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
+                 if !s2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
             }
             if ui.button("STOP ALL ■").clicked() {
                 self.is_running = false;
@@ -299,40 +289,40 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 if self.esp_connected_1 {
                     if let Some(sender) = &self.esp_command_sender_1 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 0".to_string())) {
-                            self.esp_status_message_1 = format!("ESP L: Error sending STOP: {}", e);
-                            self.add_esp_log_message("ESP L", format!("Error sending STOP: {}",e));
+                            self.esp_status_message_1 = format!("ESP1: Error sending STOP: {}", e);
+                            self.add_esp_log_message("ESP1", format!("Error sending STOP: {}",e));
                             s1_msg_set = true;
                         } else {
-                            self.esp_status_message_1 = "ESP L: STOP command sent.".to_string();
-                            self.add_esp_log_message("ESP L", "STOP command sent.".to_string());
+                            self.esp_status_message_1 = "ESP1: STOP command sent.".to_string();
+                            self.add_esp_log_message("ESP1", "STOP command sent.".to_string());
                             s1_msg_set = true;
                         }
                     }
                 } else {
-                    self.esp_status_message_1 = "ESP L: Cannot STOP, not connected.".to_string();
-                    self.add_esp_log_message("ESP L", "Attempted STOP while ESP L not connected.".to_string());
+                    self.esp_status_message_1 = "ESP1: Cannot STOP, not connected.".to_string();
+                    self.add_esp_log_message("ESP1", "Attempted STOP while ESP1 not connected.".to_string());
                     s1_msg_set = true;
                 }
 
                 if self.esp_connected_2 {
                     if let Some(sender) = &self.esp_command_sender_2 {
                         if let Err(e) = sender.send(EspCommand::SendCommand("tempActive 0".to_string())) {
-                            self.esp_status_message_2 = format!("ESP R: Error sending STOP: {}", e);
-                            self.add_esp_log_message("ESP R", format!("Error sending STOP: {}",e));
+                            self.esp_status_message_2 = format!("ESP2: Error sending STOP: {}", e);
+                            self.add_esp_log_message("ESP2", format!("Error sending STOP: {}",e));
                             s2_msg_set = true;
                         } else {
-                            self.esp_status_message_2 = "ESP R: STOP command sent.".to_string();
-                            self.add_esp_log_message("ESP R", "STOP command sent.".to_string());
+                            self.esp_status_message_2 = "ESP2: STOP command sent.".to_string();
+                            self.add_esp_log_message("ESP2", "STOP command sent.".to_string());
                             s2_msg_set = true;
                         }
                     }
                 } else {
-                    self.esp_status_message_2 = "ESP R: Cannot STOP, not connected.".to_string();
-                    self.add_esp_log_message("ESP R", "Attempted STOP while ESP R not connected.".to_string());
+                    self.esp_status_message_2 = "ESP2: Cannot STOP, not connected.".to_string();
+                    self.add_esp_log_message("ESP2", "Attempted STOP while ESP2 not connected.".to_string());
                     s2_msg_set = true;
                 }
-                if !s1_msg_set { self.esp_status_message_1 = "ESP L: Status unchanged.".to_string(); }
-                if !s2_msg_set { self.esp_status_message_2 = "ESP R: Status unchanged.".to_string(); }
+                if !s1_msg_set { self.esp_status_message_1 = "ESP1: Status unchanged.".to_string(); }
+                if !s2_msg_set { self.esp_status_message_2 = "ESP2: Status unchanged.".to_string(); }
             }
         });
 
@@ -356,7 +346,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         ui.visuals_mut().override_text_color = None; 
 
         ui.horizontal(|ui| {
-            ui.label("ESP Left: ");
+            ui.label("ESP 1: ");
             if self.esp_connected_1 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -366,10 +356,10 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
             }
         });
         ui.visuals_mut().override_text_color = None; 
-        // ui.label(&self.esp_status_message_1);
+        ui.label(&self.esp_status_message_1);
 
         ui.horizontal(|ui| {
-            ui.label("ESP Right: ");
+            ui.label("ESP 2: ");
             if self.esp_connected_2 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -379,15 +369,14 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
             }
         });
         ui.visuals_mut().override_text_color = None; 
-      //  ui.label(&self.esp_status_message_2);
+        ui.label(&self.esp_status_message_2);
 
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Manual Left Temp: ");
+            ui.label("Manual Pelt 1 temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_1_temp_str).desired_width(50.0));
 
             if ui.button("Set Temp").clicked() {
-                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_1_temp_str.parse::<i8>() {
                     if self.pelt_temp_1 != temp_val { // Only if value actually changes
                         self.pelt_temp_1 = temp_val;
@@ -402,11 +391,10 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Manual Right Temp: ");
+            ui.label("Manual Pelt 2 temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_2_temp_str).desired_width(50.0));
 
             if ui.button("Set Temp").clicked() {
-                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_2_temp_str.parse::<i8>() {
                     if self.pelt_temp_2 != temp_val { // Only if value actually changes
                         self.pelt_temp_2 = temp_val;
@@ -457,17 +445,17 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("ESP Connections");
         ui.separator();
 
-        // --- ESP L (Peltier 1) ---
-        ui.heading("Left Module");
+        // --- ESP 1 (Peltier 1) ---
+        ui.heading("ESP 1 (Peltier 1)");
         let port_text_edit_1 = egui::TextEdit::singleline(&mut self.esp_port_1).desired_width(150.0);
         ui.horizontal(|ui| {
-            ui.label("Serial Port:");
+            ui.label("ESP 1 Serial Port:");
             ui.add_enabled(self.esp_thread_handle_1.is_none(), port_text_edit_1); 
         });
 
         let mut baud_str_edit_1 = self.esp_baud_rate_1.to_string();
          ui.horizontal(|ui| {
-            ui.label("Baud Rate:");
+            ui.label("ESP 1 Baud Rate:");
             let response = ui.add_enabled(
                 self.esp_thread_handle_1.is_none(),
                 egui::TextEdit::singleline(&mut baud_str_edit_1).desired_width(100.0)
@@ -480,7 +468,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         });
 
         if self.esp_thread_handle_1.is_none() { 
-            if ui.button("Connect to ESP Left").clicked() {
+            if ui.button("Connect to ESP 1").clicked() {
                 let (command_s, command_r) = mpsc::channel();
                 let (status_s, status_r) = mpsc::channel();
                 self.esp_command_sender_1 = Some(command_s.clone());
@@ -489,36 +477,37 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 let baud_rate_clone = self.esp_baud_rate_1;
                 
                 self.esp_thread_handle_1 = Some(thread::spawn(move || {
-                    esp_worker_thread(command_r, status_s); // This worker thread now implicitly handles ESP L
+                    esp_worker_thread(command_r, status_s); // This worker thread now implicitly handles ESP1
                 }));
                 
-                let connect_msg = format!("Attempting to connect to ESP L @ {} ({} baud)...", self.esp_port_1, self.esp_baud_rate_1);
+                let connect_msg = format!("Attempting to connect to ESP1 @ {} ({} baud)...", self.esp_port_1, self.esp_baud_rate_1);
                 if let Err(e) = command_s.send(EspCommand::Connect(port_name_clone, baud_rate_clone)) {
-                     self.esp_status_message_1 = format!("ESP L: Failed to send connect cmd: {}",e);
-                     self.add_esp_log_message("ESP L", format!("Failed to send connect cmd: {}",e));
+                     self.esp_status_message_1 = format!("ESP1: Failed to send connect cmd: {}",e);
+                     self.add_esp_log_message("ESP1", format!("Failed to send connect cmd: {}",e));
                      self.esp_command_sender_1 = None;
                      self.esp_status_receiver_1 = None;
                      self.esp_thread_handle_1.take();
                 } else {
                     self.esp_status_message_1 = connect_msg.clone();
-                    self.add_esp_log_message("ESP L", connect_msg);
+                    self.add_esp_log_message("ESP1", connect_msg);
                 }
             }
         } else {
-            if ui.button("Disconnect from ESP Left").clicked() {
+            if ui.button("Disconnect from ESP 1").clicked() {
                 if let Some(sender) = &self.esp_command_sender_1 {
                     if let Err(e) = sender.send(EspCommand::Disconnect) {
-                         self.esp_status_message_1 = format!("ESP L: Failed to send disconnect cmd: {}",e);
-                         self.add_esp_log_message("ESP L", format!("Failed to send disconnect cmd: {}",e));
+                         self.esp_status_message_1 = format!("ESP1: Failed to send disconnect cmd: {}",e);
+                         self.add_esp_log_message("ESP1", format!("Failed to send disconnect cmd: {}",e));
                     } else {
-                        self.esp_status_message_1 = "ESP L: Disconnect command sent.".to_string();
-                        self.add_esp_log_message("ESP L", "Disconnect command sent.".to_string());
+                        self.esp_status_message_1 = "ESP1: Disconnect command sent.".to_string();
+                        self.add_esp_log_message("ESP1", "Disconnect command sent.".to_string());
                     }
                 }
             }
         }
+
         ui.horizontal(|ui| {
-            ui.label("ESP L Status:");
+            ui.label("ESP 1 Status:");
             if self.esp_connected_1 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -527,33 +516,35 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 ui.label("DISCONNECTED");
             }
         });
+
         ui.visuals_mut().override_text_color = None; 
         ui.label(&self.esp_status_message_1);
         #[cfg(debug_assertions)] 
         if self.esp_connected_1 {
-            if ui.button("Send 'PING' to ESP L").clicked() {
+            if ui.button("Send 'PING' to ESP 1").clicked() {
                  if let Some(sender) = &self.esp_command_sender_1 {
                     if let Err(e) = sender.send(EspCommand::SendCommand("PING".to_string())) {
-                        self.add_esp_log_message("ESP L", format!("Error sending PING: {}", e));
+                        self.add_esp_log_message("ESP1", format!("Error sending PING: {}", e));
                     } else {
-                        self.add_esp_log_message("ESP L", "Sent PING to ESP L.".to_string());
+                        self.add_esp_log_message("ESP1", "Sent PING to ESP1.".to_string());
                     }
                  }
             }
         }
+        
         ui.separator();
 
-        // --- ESP R (Peltier 2) ---
-        ui.heading("Right Module");
+        // --- ESP 2 (Peltier 2) ---
+        ui.heading("ESP 2 (Peltier 2)");
         let port_text_edit_2 = egui::TextEdit::singleline(&mut self.esp_port_2).desired_width(150.0);
         ui.horizontal(|ui| {
-            ui.label("Serial Port:");
+            ui.label("ESP 2 Serial Port:");
             ui.add_enabled(self.esp_thread_handle_2.is_none(), port_text_edit_2); 
         });
 
         let mut baud_str_edit_2 = self.esp_baud_rate_2.to_string();
          ui.horizontal(|ui| {
-            ui.label("Baud Rate:");
+            ui.label("ESP 2 Baud Rate:");
             let response = ui.add_enabled(
                 self.esp_thread_handle_2.is_none(),
                 egui::TextEdit::singleline(&mut baud_str_edit_2).desired_width(100.0)
@@ -566,7 +557,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         });
 
         if self.esp_thread_handle_2.is_none() { 
-            if ui.button("Connect to ESP Right").clicked() {
+            if ui.button("Connect to ESP 2").clicked() {
                 let (command_s, command_r) = mpsc::channel();
                 let (status_s, status_r) = mpsc::channel();
                 self.esp_command_sender_2 = Some(command_s.clone());
@@ -575,36 +566,36 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
                 let baud_rate_clone = self.esp_baud_rate_2;
                 
                 self.esp_thread_handle_2 = Some(thread::spawn(move || {
-                    esp_worker_thread(command_r, status_s); // This worker thread now implicitly handles ESP R
+                    esp_worker_thread(command_r, status_s); // This worker thread now implicitly handles ESP2
                 }));
                 
-                let connect_msg = format!("Attempting to connect to ESP R @ {} ({} baud)...", self.esp_port_2, self.esp_baud_rate_2);
+                let connect_msg = format!("Attempting to connect to ESP2 @ {} ({} baud)...", self.esp_port_2, self.esp_baud_rate_2);
                 if let Err(e) = command_s.send(EspCommand::Connect(port_name_clone, baud_rate_clone)) {
-                     self.esp_status_message_2 = format!("ESP R: Failed to send connect cmd: {}",e);
-                     self.add_esp_log_message("ESP R", format!("Failed to send connect cmd: {}",e));
+                     self.esp_status_message_2 = format!("ESP2: Failed to send connect cmd: {}",e);
+                     self.add_esp_log_message("ESP2", format!("Failed to send connect cmd: {}",e));
                      self.esp_command_sender_2 = None;
                      self.esp_status_receiver_2 = None;
                      self.esp_thread_handle_2.take();
                 } else {
                     self.esp_status_message_2 = connect_msg.clone();
-                    self.add_esp_log_message("ESP R", connect_msg);
+                    self.add_esp_log_message("ESP2", connect_msg);
                 }
             }
         } else {
-            if ui.button("Disconnect from ESP Right").clicked() {
+            if ui.button("Disconnect from ESP 2").clicked() {
                 if let Some(sender) = &self.esp_command_sender_2 {
                     if let Err(e) = sender.send(EspCommand::Disconnect) {
-                         self.esp_status_message_2 = format!("ESP R: Failed to send disconnect cmd: {}",e);
-                         self.add_esp_log_message("ESP R", format!("Failed to send disconnect cmd: {}",e));
+                         self.esp_status_message_2 = format!("ESP2: Failed to send disconnect cmd: {}",e);
+                         self.add_esp_log_message("ESP2", format!("Failed to send disconnect cmd: {}",e));
                     } else {
-                        self.esp_status_message_2 = "ESP R: Disconnect command sent.".to_string();
-                        self.add_esp_log_message("ESP R", "Disconnect command sent.".to_string());
+                        self.esp_status_message_2 = "ESP2: Disconnect command sent.".to_string();
+                        self.add_esp_log_message("ESP2", "Disconnect command sent.".to_string());
                     }
                 }
             }
         }
         ui.horizontal(|ui| {
-            ui.label("ESP R Status:");
+            ui.label("ESP 2 Status:");
             if self.esp_connected_2 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -618,12 +609,12 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
 
         #[cfg(debug_assertions)] 
         if self.esp_connected_2 {
-            if ui.button("Send 'PING' to ESP R").clicked() {
+            if ui.button("Send 'PING' to ESP 2").clicked() {
                  if let Some(sender) = &self.esp_command_sender_2 {
                     if let Err(e) = sender.send(EspCommand::SendCommand("PING".to_string())) {
-                        self.add_esp_log_message("ESP R", format!("Error sending PING: {}", e));
+                        self.add_esp_log_message("ESP2", format!("Error sending PING: {}", e));
                     } else {
-                        self.add_esp_log_message("ESP R", "Sent PING to ESP R.".to_string());
+                        self.add_esp_log_message("ESP2", "Sent PING to ESP2.".to_string());
                     }
                  }
             }
@@ -665,9 +656,9 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
 
                 if key == "Skin_Temp_Smoothed" {
                     if let Ok(temp_f32) = value_str.parse::<f32>() {
-                        if esp_id_str == "ESP L" {
+                        if esp_id_str == "ESP1" {
                             self.skin_temp_1 = Some(temp_f32);
-                        } else if esp_id_str == "ESP R" {
+                        } else if esp_id_str == "ESP2" {
                             self.skin_temp_2 = Some(temp_f32);
                         }
                     } else {
@@ -689,14 +680,12 @@ impl eframe::App for TemplateApp {
         // Process incoming OSC messages
 // Process ALL available OSC messages this frame
         while let Ok(osc_id_and_message) = self.osc_receiver.try_recv() {
-          //  println!("APP_RS_RX: {:?}", osc_id_and_message); // Added a prefix for clarity
             self.update_pelt_temp(osc_id_and_message.0, osc_id_and_message.1);
         }
         
-
         let mut processed_any_message_this_frame = false;
 
-        // Process incoming ESP L status messages
+        // Process incoming ESP 1 status messages
         let receiver1_temp_opt = self.esp_status_receiver_1.take();
         let mut clear_receiver1_permanently = false; 
         if let Some(ref rx1) = receiver1_temp_opt { 
@@ -705,49 +694,51 @@ impl eframe::App for TemplateApp {
                 match status {
                     EspStatus::Connected => {
                         self.esp_connected_1 = true;
-                        self.esp_status_message_1 = "ESP L Connected.".to_string();
-                        self.add_esp_log_message("ESP L", "Connected.".to_string());
+                        self.esp_status_message_1 = "ESP1 Connected.".to_string();
+                        self.add_esp_log_message("ESP1", "Connected.".to_string());
                     }
                     EspStatus::Disconnected(reason) => {
                         self.esp_connected_1 = false;
                         let msg = reason.unwrap_or_else(|| "Disconnected by worker.".to_string());
-                        self.esp_status_message_1 = format!("ESP L: {}", msg);
-                        self.add_esp_log_message("ESP L", msg);
+                        self.esp_status_message_1 = format!("ESP1: {}", msg);
+                        self.add_esp_log_message("ESP1", msg);
 
                         if let Some(handle) = self.esp_thread_handle_1.take() {
-                             let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP L", format!("Thread panicked or error on join: {:?}", e)));
+                             let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP1", format!("Thread panicked or error on join: {:?}", e)));
                         }
                         self.esp_command_sender_1 = None;
                         clear_receiver1_permanently = true; 
                     }
                     EspStatus::Error(err_msg) => {
                         let full_err_msg = format!("Error: {}", err_msg);
-                        self.esp_status_message_1 = format!("ESP L: {}",full_err_msg);
-                        self.add_esp_log_message("ESP L", full_err_msg);
+                        self.esp_status_message_1 = format!("ESP1: {}",full_err_msg);
+                        self.add_esp_log_message("ESP1", full_err_msg);
                     }
                     EspStatus::Message(msg) => {
-                        self.add_esp_log_message("ESP L", format!("MSG: {}", msg));
-                        self.parse_esp_message_and_update_state("ESP L", &msg);
+                        self.add_esp_log_message("ESP1", format!("MSG: {}", msg));
+                        self.parse_esp_message_and_update_state("ESP1", &msg);
                     }
                 }
             }
         }
+
         if !clear_receiver1_permanently && receiver1_temp_opt.is_some() {
             self.esp_status_receiver_1 = receiver1_temp_opt;
-        } else if clear_receiver1_permanently {
+        } 
+        else if clear_receiver1_permanently {
              if self.esp_thread_handle_1.is_some() {
                 if let Some(handle) = self.esp_thread_handle_1.take() {
-                    self.add_esp_log_message("ESP L", "Ensuring thread is joined after disconnect (update).".to_string());
-                    let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP L", format!("Thread panicked/error on join (update): {:?}", e)));
+                    self.add_esp_log_message("ESP1", "Ensuring thread is joined after disconnect (update).".to_string());
+                    let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP1", format!("Thread panicked/error on join (update): {:?}", e)));
                 }
              }
              if self.esp_command_sender_1.is_some() && self.esp_thread_handle_1.is_none() {
                 self.esp_command_sender_1 = None;
-                self.add_esp_log_message("ESP L", "Cleared command sender as thread handle is gone.".to_string());
+                self.add_esp_log_message("ESP1", "Cleared command sender as thread handle is gone.".to_string());
              }
         }
 
-        // Process incoming ESP R status messages
+        // Process incoming ESP 2 status messages
         let receiver2_temp_opt = self.esp_status_receiver_2.take();
         let mut clear_receiver2_permanently = false;
         if let Some(ref rx2) = receiver2_temp_opt {
@@ -756,29 +747,29 @@ impl eframe::App for TemplateApp {
                 match status {
                     EspStatus::Connected => {
                         self.esp_connected_2 = true;
-                        self.esp_status_message_2 = "ESP R Connected.".to_string();
-                        self.add_esp_log_message("ESP R", "Connected.".to_string());
+                        self.esp_status_message_2 = "ESP2 Connected.".to_string();
+                        self.add_esp_log_message("ESP2", "Connected.".to_string());
                     }
                     EspStatus::Disconnected(reason) => {
                         self.esp_connected_2 = false;
                         let msg = reason.unwrap_or_else(|| "Disconnected by worker.".to_string());
-                        self.esp_status_message_2 = format!("ESP R: {}", msg);
-                        self.add_esp_log_message("ESP R", msg);
+                        self.esp_status_message_2 = format!("ESP2: {}", msg);
+                        self.add_esp_log_message("ESP2", msg);
 
                         if let Some(handle) = self.esp_thread_handle_2.take() {
-                             let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP R", format!("Thread panicked or error on join: {:?}", e)));
+                             let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP2", format!("Thread panicked or error on join: {:?}", e)));
                         }
                         self.esp_command_sender_2 = None;
                         clear_receiver2_permanently = true;
                     }
                     EspStatus::Error(err_msg) => {
                         let full_err_msg = format!("Error: {}", err_msg);
-                        self.esp_status_message_2 = format!("ESP R: {}",full_err_msg);
-                        self.add_esp_log_message("ESP R", full_err_msg);
+                        self.esp_status_message_2 = format!("ESP2: {}",full_err_msg);
+                        self.add_esp_log_message("ESP2", full_err_msg);
                     }
                     EspStatus::Message(msg) => {
-                        self.parse_esp_message_and_update_state("ESP R", &msg);
-                        self.add_esp_log_message("ESP R", format!("MSG: {}", msg));
+                        self.parse_esp_message_and_update_state("ESP2", &msg);
+                        self.add_esp_log_message("ESP2", format!("MSG: {}", msg));
                     }
                 }
             }
@@ -786,22 +777,24 @@ impl eframe::App for TemplateApp {
 
         if !clear_receiver2_permanently && receiver2_temp_opt.is_some() {
             self.esp_status_receiver_2 = receiver2_temp_opt;
-        } else if clear_receiver2_permanently {
+        } 
+        else if clear_receiver2_permanently {
              if self.esp_thread_handle_2.is_some() {
                 if let Some(handle) = self.esp_thread_handle_2.take() {
-                    self.add_esp_log_message("ESP R", "Ensuring thread is joined after disconnect (update).".to_string());
-                    let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP R", format!("Thread panicked/error on join (update): {:?}", e)));
+                    self.add_esp_log_message("ESP2", "Ensuring thread is joined after disconnect (update).".to_string());
+                    let _ = handle.join().map_err(|e| self.add_esp_log_message("ESP2", format!("Thread panicked/error on join (update): {:?}", e)));
                 }
              }
              if self.esp_command_sender_2.is_some() && self.esp_thread_handle_2.is_none() {
                 self.esp_command_sender_2 = None;
-                self.add_esp_log_message("ESP R", "Cleared command sender as thread handle is gone.".to_string());
+                self.add_esp_log_message("ESP2", "Cleared command sender as thread handle is gone.".to_string());
              }
         }
 
         if self.osc_receiver.try_recv().is_ok() || processed_any_message_this_frame {
             ctx.request_repaint();
-        } else {
+        } 
+        else {
             ctx.request_repaint_after_for(Duration::from_millis(75), ctx.viewport_id());
         }
 
@@ -821,7 +814,7 @@ impl eframe::App for TemplateApp {
                     if ui.add_sized([button_width, button_height], egui::SelectableLabel::new(self.current_page == Page::OscSettings, "OSC Settings")).clicked() {
                         self.current_page = Page::OscSettings;
                     }
-                    if ui.add_sized([button_width, button_height], egui::SelectableLabel::new(self.current_page == Page::EspConnection, "ESP Connection:")).clicked() {
+                    if ui.add_sized([button_width, button_height], egui::SelectableLabel::new(self.current_page == Page::EspConnection, "ESP Connection")).clicked() {
                         self.current_page = Page::EspConnection;
                     }
                     if ui.add_sized([button_width, button_height], egui::SelectableLabel::new(self.current_page == Page::AppSettings, "App Settings")).clicked() {
@@ -850,37 +843,36 @@ impl eframe::App for TemplateApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.add_esp_log_message("APP", "Application exiting. Stopping ESP workers.".to_string());
         
-        // ESP L shutdown
+        // ESP 1 shutdown
         if let Some(sender) = self.esp_command_sender_1.take() {
             // Attempt to send StopThread, ignore error if channel already closed (e.g., worker already exited)
             let _ = sender.send(EspCommand::StopThread); 
         }
         if let Some(handle) = self.esp_thread_handle_1.take() {
            
-            if let Err(e) = handle.join().map_err(|e_join| format!("ESP L thread panicked or error on join: {:?}", e_join)) {
-                self.add_esp_log_message("ESP L", e); 
+            if let Err(e) = handle.join().map_err(|e_join| format!("ESP1 thread panicked or error on join: {:?}", e_join)) {
+                self.add_esp_log_message("ESP1", e); 
             }
         }
 
-        // ESP R shutdown
+        // ESP 2 shutdown
         if let Some(sender) = self.esp_command_sender_2.take() {
             let _ = sender.send(EspCommand::StopThread);
         }
         if let Some(handle) = self.esp_thread_handle_2.take() {
         
-            if let Err(e) = handle.join().map_err(|e_join| format!("ESP R thread panicked or error on join: {:?}", e_join)) {
-                self.add_esp_log_message("ESP R", e);
+            if let Err(e) = handle.join().map_err(|e_join| format!("ESP2 thread panicked or error on join: {:?}", e_join)) {
+                self.add_esp_log_message("ESP2", e);
             }
         }
     }
 }
 
-
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.label("Source Code ");
-        ui.hyperlink_to("TempSense", "https://github.com/emilk/egui"); // Consider updating the link/name if it's your project
+        ui.hyperlink_to("TempSense", "https://github.com/TempSenseVR/TempSense-GUI/");
         ui.label(".");
     });
 }

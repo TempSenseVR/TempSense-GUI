@@ -64,7 +64,6 @@ fn handle_packet(packet: OscPacket, sender: &Sender<(i8, i8)>) {
 
                 let address_msg_tuple: (i8, i8) = (id, int_value);
                 sender.send(address_msg_tuple).unwrap(); 
-             //   println!("Scaled {:?}", address_msg_tuple);
             }
         }
         OscPacket::Bundle(bundle) => {
