@@ -1,18 +1,11 @@
 // src/app.rs
 
-// Add these to your existing use statements
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-// If esp_comm.rs is in src, and your main.rs or lib.rs has `mod esp_comm;`
-// or if app.rs is a module itself, adjust path accordingly.
-// Assuming app.rs is in the same directory level as esp_comm.rs, and both are modules of main.rs/lib.rs:
-// pub mod esp_comm; // in main.rs or lib.rs
-// then in app.rs:
 use crate::esp_comm::{EspCommand, EspStatus, esp_worker_thread}; // Adjust path if needed
 
-// ... (your existing Page enum)
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Page {
     Home,
@@ -20,7 +13,6 @@ pub enum Page {
     EspConnection,
     AppSettings
 }
-
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -179,7 +171,7 @@ impl TemplateApp {
 fn render_home_page(&mut self, ui: &mut egui::Ui) {
         // Peltier 1
         ui.horizontal(|ui| {
-            ui.label("Pelt 1:");
+            ui.label("L Module:");
             ui.visuals_mut().override_text_color = Some(if self.is_running && self.esp_connected_1 { egui::Color32::GREEN } else { egui::Color32::LIGHT_RED });
             ui.label(if self.is_running && self.esp_connected_1 { "ON" } else { "OFF" });
             ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY); 
@@ -212,7 +204,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
             
         // Peltier 2
         ui.horizontal(|ui| {
-            ui.label("Pelt 2:");
+            ui.label("R Module:");
             ui.visuals_mut().override_text_color = Some(if self.is_running && self.esp_connected_2 { egui::Color32::GREEN } else { egui::Color32::LIGHT_RED });
             ui.label(if self.is_running && self.esp_connected_2 { "ON" } else { "OFF" });
             ui.visuals_mut().override_text_color = Some(egui::Color32::GRAY);
@@ -243,8 +235,6 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         });
         ui.visuals_mut().override_text_color = None;
         
-        // ... (rest of your render_home_page function, like START/STOP, status, manual inputs) ...
-        // The manual input sections with `ui.ctx().request_repaint()` are fine as you provided them.
         ui.separator();
 
         ui.horizontal(|ui| {
@@ -356,7 +346,7 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         ui.visuals_mut().override_text_color = None; 
 
         ui.horizontal(|ui| {
-            ui.label("ESP Left: ");
+            ui.label("ESP L: ");
             if self.esp_connected_1 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -366,10 +356,9 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
             }
         });
         ui.visuals_mut().override_text_color = None; 
-        // ui.label(&self.esp_status_message_1);
 
         ui.horizontal(|ui| {
-            ui.label("ESP Right: ");
+            ui.label("ESP R: ");
             if self.esp_connected_2 {
                 ui.visuals_mut().override_text_color = Some(egui::Color32::GREEN);
                 ui.label("CONNECTED");
@@ -379,15 +368,14 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
             }
         });
         ui.visuals_mut().override_text_color = None; 
-      //  ui.label(&self.esp_status_message_2);
 
         ui.separator();
+
         ui.horizontal(|ui| {
-            ui.label("Manual Left Temp: ");
+            ui.label("Manual L Temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_1_temp_str).desired_width(50.0));
 
             if ui.button("Set Temp").clicked() {
-                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_1_temp_str.parse::<i8>() {
                     if self.pelt_temp_1 != temp_val { // Only if value actually changes
                         self.pelt_temp_1 = temp_val;
@@ -402,11 +390,10 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Manual Right Temp: ");
+            ui.label("Manual R Temp: ");
             ui.add(egui::TextEdit::singleline(&mut self.manual_pelt_2_temp_str).desired_width(50.0));
 
             if ui.button("Set Temp").clicked() {
-                // ui.ctx().request_repaint(); // This was already in your provided code
                 if let Ok(temp_val) = self.manual_pelt_2_temp_str.parse::<i8>() {
                     if self.pelt_temp_2 != temp_val { // Only if value actually changes
                         self.pelt_temp_2 = temp_val;
@@ -644,6 +631,9 @@ fn render_home_page(&mut self, ui: &mut egui::Ui) {
         ui.separator();
         
         egui::widgets::global_theme_preference_buttons(ui);
+
+        ui.separator();
+        ui.label("App Version: v0.2"); // TODO make app version a variable so this does not get forgotten with updates
     }
 
     // Added esp_identifier to distinguish log messages
@@ -880,7 +870,7 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.label("Source Code ");
-        ui.hyperlink_to("TempSense", "https://github.com/emilk/egui"); // Consider updating the link/name if it's your project
+        ui.hyperlink_to("TempSense", "https://github.com/TempSenseVR/TempSense-GUI");
         ui.label(".");
     });
 }

@@ -27,19 +27,19 @@ fn main() -> eframe::Result {
             .with_inner_size([400.0, 300.0])
             .with_min_inner_size([300.0, 220.0])
             .with_icon(
-                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
+                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-TempSense-256.png")[..])
                     .expect("Failed to load icon"),
             ),
         ..Default::default()
     };
-    
+
     let app = app::TemplateApp {
         osc_receiver: receiver,
         ..Default::default()
     };
     
     eframe::run_native(
-        "TempSense GUI",
+        "TempSense GUI v0.2",
         native_options,
         Box::new(|cc| {
 
