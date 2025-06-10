@@ -39,7 +39,7 @@ fn main() -> eframe::Result {
     };
     
     eframe::run_native(
-        "TempSense GUI v0.2",
+        "TempSense GUI v0.3",
         native_options,
         Box::new(|cc| {
 
