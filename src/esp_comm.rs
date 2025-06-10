@@ -83,12 +83,7 @@ pub fn esp_worker_thread(
                         } else {
                             status_tx.send(EspStatus::Message("Already disconnected.".to_string())).ok();
                         }
-                        // If Disconnect command is from GUI, GUI expects worker to stop.
-                        // The worker does this by no longer having a serial_port.
-                        // To fully stop the thread, StopThread is preferred.
-                        // However, after user disconnect, the main app will likely drop sender or send StopThread.
-                        // For now, let's assume this is sufficient, or let StopThread handle full exit.
-                        // If this command should also stop the thread, add 'break;'
+                        break;
                     }
                     EspCommand::StopThread => {
                         serial_port.take(); 
